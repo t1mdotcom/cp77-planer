@@ -1,0 +1,673 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Night City Fahrplan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: sticky Entscheidungs-Konsole links, Plan + Questliste rechts, auf dem Handy gestapelt.
+   Palette: Neon-Gelb als Aktion, Cyan als Info, Magenta als Warnung, kühle Neutrale. */
+:root{
+  --font-display:'Chakra Petch','Arial Narrow',sans-serif;
+  --font-body:'IBM Plex Sans',system-ui,sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,monospace;
+  --bg:#e8ebf0; --panel:#f7f8fa; --panel2:#eceff4; --line:#c6ccd8;
+  --fg:#12141b; --mute:#566075;
+  --accent:#f3e600; --on-accent:#12141b; --accent-ink:#6a5e00;
+  --cyan:#00707a; --mag:#b3124f;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0b0c10; --panel:#14161d; --panel2:#1b1e27; --line:#2b303c;
+    --fg:#e8eaf0; --mute:#9399aa;
+    --accent:#f3e600; --on-accent:#0b0c10; --accent-ink:#f3e600;
+    --cyan:#2fdce4; --mag:#ff4a86;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0b0c10; --panel:#14161d; --panel2:#1b1e27; --line:#2b303c;
+  --fg:#e8eaf0; --mute:#9399aa;
+  --accent:#f3e600; --on-accent:#0b0c10; --accent-ink:#f3e600;
+  --cyan:#2fdce4; --mag:#ff4a86;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--bg); color:var(--fg);
+  font:15px/1.55 var(--font-body);
+  padding-block:28px 56px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+}
+button{font:inherit;color:inherit}
+.app{max-width:1200px;margin:0 auto;display:grid;gap:28px}
+header h1{
+  font:700 clamp(2rem,5vw,3.2rem)/1.05 var(--font-display);
+  letter-spacing:.05em;text-transform:uppercase;margin:6px 0 12px;text-wrap:balance;
+}
+.hl{background:var(--accent);color:var(--on-accent);padding:0 .22em;margin-left:.1em}
+.eyebrow{font:500 .75rem var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--mute);margin:0}
+.lede{max-width:64ch;color:var(--mute);margin:0}
+.shell{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:28px;align-items:start}
+.side{position:sticky;top:12px;display:grid;gap:16px;max-height:calc(100vh - 24px);overflow:auto;min-width:0}
+.main{display:grid;gap:24px;min-width:0}
+@media (max-width:880px){
+  .shell{grid-template-columns:minmax(0,1fr)}
+  .side{position:static;max-height:none;overflow:visible}
+}
+.panel{background:var(--panel);border:1px solid var(--line);padding:16px;display:grid;gap:18px}
+.grp{display:grid;gap:8px;min-width:0}
+.grp h3{font:500 .72rem var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--mute);margin:0}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.sb{
+  flex:1 1 auto;min-width:0;padding:8px 12px;border:1px solid var(--line);background:var(--panel2);
+  color:var(--fg);cursor:pointer;border-radius:2px;font-size:.88rem;text-align:center;
+}
+.sb[aria-checked="true"],.sb[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
+.sb:disabled{opacity:.38;cursor:not-allowed}
+.sb:hover:not(:disabled):not([aria-checked="true"]):not([aria-pressed="true"]){border-color:var(--mute)}
+button:focus-visible,input:focus-visible+.box,textarea:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.hint{font-size:.8rem;color:var(--mute);margin:0}
+.eo{
+  display:grid;gap:2px;width:100%;text-align:left;padding:9px 12px;border:1px solid var(--line);
+  background:var(--panel2);cursor:pointer;border-radius:2px;
+}
+.eo b{font:600 .95rem var(--font-display);letter-spacing:.04em;text-transform:uppercase}
+.eo span{font-size:.8rem;color:var(--mute)}
+.eo[aria-checked="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.eo[aria-checked="true"] b::after{content:" ◂";color:var(--accent-ink)}
+.eo:disabled{opacity:.38;cursor:not-allowed}
+.list{display:grid;gap:6px}
+.sw{
+  display:flex;align-items:center;gap:10px;width:100%;padding:8px 12px;border:1px solid var(--line);
+  background:var(--panel2);cursor:pointer;text-align:left;border-radius:2px;font-size:.88rem;
+}
+.sw .tr{margin-left:auto;width:34px;height:18px;background:var(--line);position:relative;flex:none}
+.sw .tr::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;background:var(--fg);transition:transform .15s}
+.sw[aria-checked="true"] .tr{background:var(--accent)}
+.sw[aria-checked="true"] .tr::after{transform:translateX(16px);background:var(--on-accent)}
+.cut{clip-path:polygon(0 0,calc(100% - 22px) 0,100% 22px,100% 100%,22px 100%,0 calc(100% - 22px))}
+.plan{position:relative;background:var(--panel);padding:22px 22px 22px;display:grid;gap:14px;border:0}
+.plan::before{content:"";position:absolute;top:0;left:0;width:64px;height:4px;background:var(--accent)}
+.plan h2{font:700 clamp(1.5rem,3.4vw,2.1rem)/1.1 var(--font-display);letter-spacing:.05em;text-transform:uppercase;margin:0;text-wrap:balance}
+.plan h2 small{display:block;font:500 .78rem var(--font-mono);letter-spacing:.1em;color:var(--accent-ink);text-transform:uppercase;margin-top:6px}
+.plan p{margin:0;max-width:68ch}
+.facts{display:flex;flex-wrap:wrap;gap:6px}
+.fact{font:400 .74rem var(--font-mono);border:1px solid var(--line);padding:3px 8px;color:var(--mute)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+.stat{display:grid;gap:6px}
+.stat .t{font:500 .74rem var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
+.stat .v{font:600 1.35rem var(--font-display);font-variant-numeric:tabular-nums}
+.bar{height:6px;background:var(--line);position:relative}
+.bar i{position:absolute;inset:0 auto 0 0;background:var(--accent);transition:width .25s}
+.warns{display:grid;gap:8px}
+.w{padding:9px 12px;font-size:.88rem;border:1px solid var(--line);background:var(--panel2)}
+.w b{font:600 .72rem var(--font-mono);letter-spacing:.1em;text-transform:uppercase;margin-right:8px}
+.w.warn{border-color:var(--mag)}.w.warn b{color:var(--mag)}
+.w.info b{color:var(--cyan)}
+details.script{border:1px solid var(--line);background:var(--panel2)}
+details.script summary{cursor:pointer;padding:11px 14px;font:600 .95rem var(--font-display);letter-spacing:.05em;text-transform:uppercase}
+details.script ol{margin:0;padding:2px 18px 16px 38px;display:grid;gap:8px;font-size:.92rem}
+details.script li::marker{font-family:var(--font-mono);color:var(--accent-ink)}
+.toolbar{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between}
+.toolbar .seg{flex:0 1 auto}
+.toolbar .sb{flex:0 0 auto;padding:6px 12px}
+.sec{display:grid;gap:8px}
+.sec h3{
+  font:600 1.05rem var(--font-display);letter-spacing:.06em;text-transform:uppercase;margin:0;
+  display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;
+}
+.sec h3 .n{font:400 .76rem var(--font-mono);color:var(--mute);letter-spacing:.04em}
+.sec .intro{margin:0;font-size:.85rem;color:var(--mute);max-width:70ch}
+ul.qs{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+.q{display:flex;gap:12px;padding:10px 2px;border-bottom:1px solid var(--line);align-items:flex-start}
+.chk{position:relative;flex:none;width:20px;height:20px;margin-top:2px;display:block}
+.chk input{position:absolute;inset:0;z-index:1;opacity:0;margin:0;cursor:pointer;width:100%;height:100%}
+.box{position:absolute;inset:0;pointer-events:none;border:1.5px solid var(--mute);background:var(--panel)}
+.chk input:checked+.box{background:var(--accent);border-color:var(--accent)}
+.chk input:checked+.box::after{content:"";position:absolute;left:5px;top:1px;width:5px;height:10px;border:solid var(--on-accent);border-width:0 2px 2px 0;transform:rotate(40deg)}
+.qb{min-width:0;display:grid;gap:3px}
+.qh{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center}
+.qn{font-weight:600;cursor:pointer}
+.is-done .qn{color:var(--mute);text-decoration:line-through;text-decoration-thickness:1px}
+.is-done .qnote{display:none}
+.qnote{margin:0;font-size:.85rem;color:var(--mute);max-width:72ch}
+.chip{font:500 .64rem var(--font-mono);letter-spacing:.08em;text-transform:uppercase;padding:1px 6px;border:1px solid var(--line);color:var(--mute)}
+.chip.must{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:500}
+.chip.rec{border-color:var(--cyan);color:var(--cyan)}
+.chip.main{color:var(--fg);border-color:var(--fg)}
+.chip.why{border-style:dashed}
+.empty{padding:16px;border:1px dashed var(--line);color:var(--mute);font-size:.9rem}
+textarea{
+  width:100%;min-height:96px;resize:vertical;background:var(--panel2);color:var(--fg);
+  border:1px solid var(--line);padding:8px;font:400 .76rem/1.4 var(--font-mono);border-radius:2px;
+}
+.row{display:flex;flex-wrap:wrap;gap:6px}
+.row .sb{flex:1 1 auto}
+.sb.danger[data-arm="1"]{background:var(--mag);border-color:var(--mag);color:#fff}
+footer{font-size:.8rem;color:var(--mute);display:grid;gap:6px;max-width:80ch}
+footer a{color:var(--accent-ink)}
+@media (prefers-reduced-motion:reduce){.bar i,.sw .tr::after{transition:none}}
+</style>
+
+</head>
+<body>
+<div class="app">
+  <header>
+    <p class="eyebrow">Cyberpunk 2077 · Zweiter Durchlauf</p>
+    <h1>Night City <span class="hl">Fahrplan</span></h1>
+    <p class="eyebrow">Stand: Patch 2.5 (22.10.2026) · Hotfix 2.500.200 (27.10.2026)</p>
+    <p class="lede">Stell links deine Kernentscheidungen ein. Der Plan zeigt, welche Quests du dafür brauchst, was vor dem Point of No Return erledigt sein muss und was am Balkon zu wählen ist. Alles bleibt in diesem Browser gespeichert und lässt sich später jederzeit umstellen.</p>
+  </header>
+
+  <div class="shell">
+    <aside class="side" aria-label="Kernentscheidungen">
+      <div class="panel" id="console"></div>
+      <div class="panel" id="io">
+        <div class="grp">
+          <h3>Daten</h3>
+          <p class="hint">Einstellungen und Häkchen als Datei sichern und auf einem anderen Gerät wieder laden.</p>
+          <div class="row">
+            <button type="button" class="sb" id="io-save" hidden>Als Datei exportieren</button>
+            <button type="button" class="sb" id="io-pick">Aus Datei importieren</button>
+            <input type="file" id="io-file" accept=".json,application/json,text/plain" hidden>
+          </div>
+          <details class="ioalt">
+            <summary class="hint">Als Text exportieren oder importieren</summary>
+            <textarea id="io-text" aria-label="Export und Import als JSON" spellcheck="false"></textarea>
+            <div class="row">
+              <button type="button" class="sb" id="io-export">Export</button>
+              <button type="button" class="sb" id="io-copy">Kopieren</button>
+              <button type="button" class="sb" id="io-load">Laden</button>
+            </div>
+          </details>
+          <button type="button" class="sb danger" id="io-reset" data-arm="0">Alles zurücksetzen</button>
+          <p class="hint" id="io-msg" role="status" aria-live="polite"></p>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <section class="plan cut" id="plan" aria-live="polite"></section>
+      <div class="toolbar">
+        <div class="seg" role="radiogroup" aria-label="Filter" id="filter"></div>
+        <span class="hint" id="count"></span>
+      </div>
+      <div id="list" class="main"></div>
+      <footer>
+        <p>Die Endings, Romanzen und Quest-Abhängigkeiten stammen aus Guides zu Patch 2.0 und Phantom Liberty. Die Notes zu 2.5 und zum Hotfix erwähnen laut den Berichten keine Änderungen daran, ich konnte aber nur Zusammenfassungen lesen, nicht die offiziellen Notes. Im Zweifel zählt das Journal im Spiel. Die Liste der Dogtown-Hauptjobs ist unvollständig, weil ich nur Einträge aufgenommen habe, die ich belegen konnte. Das Abbruch-Ende am Balkon ist bewusst nicht als Ziel enthalten.</p>
+        <p>Endings und Quests: <a href="https://www.powerpyx.com/cyberpunk-2077-endings-guide-all-endings/" target="_blank" rel="noopener">PowerPyx Endings</a> · <a href="https://www.gamesradar.com/cyberpunk-2077-endings" target="_blank" rel="noopener">GamesRadar Endings</a> · <a href="https://www.gamespot.com/articles/cyberpunk-2077-side-missions-ending-guide-do-these-before-the-point-of-no-return/1100-6485578/" target="_blank" rel="noopener">GameSpot Side Quests</a> · <a href="https://segmentnext.com/cyberpunk-2077-point-of-no-return" target="_blank" rel="noopener">SegmentNext Point of No Return</a></p>
+        <p>Patch 2.5 und Hotfix: <a href="https://kotaku.com/cyberpunk-2077-2-5-edgerunners-2-update-mods-new-quest-2000748326" target="_blank" rel="noopener">Kotaku</a> · <a href="https://www.dsogaming.com/patches/cyberpunk-2077-patch-2-5-release-notes-revealed/" target="_blank" rel="noopener">DSOGaming Notes</a> · <a href="https://www.videogameschronicle.com/news/cyberpunk-2077-is-getting-yet-another-big-update-2-years-cd-projekt-claimed-it-was-finished/" target="_blank" rel="noopener">VGC</a> · <a href="https://www.gameswelt.de/cyberpunk-2077/news/weitere-details-zum-neuen-update-2-5-335269" target="_blank" rel="noopener">Gameswelt</a> · <a href="https://www.techbloat.com/cyberpunk-2077-clampdown-guide-unlock-the-edgerunners-2-prequel-quest-and-king-gear.html" target="_blank" rel="noopener">Clampdown-Guide</a> · <a href="https://mp1st.com/?p=317528" target="_blank" rel="noopener">Hotfix 2.500.200</a> · <a href="https://gaminghq.eu/2026/10/28/cyberpunk-2077-update-2500200-major-issues-remain/" target="_blank" rel="noopener">Bekannte Probleme</a></p>
+        <p>Patch 2.3 und Ariadne: <a href="https://gameinformer.com/2025/07/16/cyberpunk-2077-update-23-brings-new-quests-vehicles-vrr-support-and-more-tomorrow" target="_blank" rel="noopener">Game Informer</a> · <a href="https://www.gamesradar.com/games/cyberpunk/cyberpunk-2077-ariadne/" target="_blank" rel="noopener">GamesRadar Ariadne</a></p>
+      </footer>
+    </main>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+var KEY="cp77-fahrplan-v1";
+var slug=function(s){return s.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")};
+var clone=function(o){return JSON.parse(JSON.stringify(o))};
+
+/* ---------- Stammdaten ---------- */
+var ROM={
+  judy:{name:"Judy Alvarez",body:"f"},
+  river:{name:"River Ward",body:"f"},
+  panam:{name:"Panam Palmer",body:"m"},
+  kerry:{name:"Kerry Eurodyne",body:"m"}
+};
+var ENDINGS={
+  star:{name:"The Star",sub:"Mit Panam und den Aldecaldos",pl:false,
+    short:"V lebt, Johnny verschwindet",
+    blurb:"V verlässt Night City mit Panam und den Aldecaldos, Johnny wird aus V's Kopf gelöscht. Laut Guides das beste Ende, V hat danach aber nur noch begrenzte Lebenszeit."},
+  sun:{name:"The Sun",sub:"Rogue und Johnny stürmen den Tower",pl:false,
+    short:"Du spielst das Finale als Johnny",
+    blurb:"Das Finale spielst du als Johnny. Er bleibt mit Alt im Cyberspace, V wird zur Legende der Afterlife."},
+  temperance:{name:"Temperance",sub:"Johnny behält V's Körper",pl:false,
+    short:"V opfert sich, Johnny lebt weiter",
+    blurb:"V überlässt Johnny den Körper, V's Konstrukt geht im Cyberspace auf. Erreichbar über Panams Hilfe oder über den Rogue-Weg."},
+  devil:{name:"The Devil",sub:"Arasaka vertrauen",pl:false,
+    short:"Hanako, Orbitalstation, Mikoshi",
+    blurb:"Du hilfst Hanako Arasaka und wachst auf einer Orbitalstation auf. Am Ende steht die Wahl, dein Engramm in Mikoshi archivieren zu lassen oder zur Erde zurückzukehren und in wenigen Monaten zu sterben."},
+  secret:{name:"Secret Ending",sub:"Solo-Sturm auf den Arasaka Tower",pl:false,
+    short:"Allein rein, niemand muss sterben",
+    blurb:"Nur mit sehr gutem Verhältnis zu Johnny: V stürmt den Tower allein. Härtester Weg, die Auflösung entspricht Sun oder Temperance."},
+  tower:{name:"The Tower",sub:"Phantom-Liberty-Heilung durch Reed",pl:true,
+    short:"Relic raus, V überlebt",
+    blurb:"Reed lässt das Relic entfernen. V überlebt, wacht aber erst 2079 auf, kann fast keine Implantate mehr nutzen und kehrt in eine veränderte Stadt zurück."}
+};
+var PLEND={
+  "songbird-a":{name:"King of Swords",cure:true,txt:"Songbird helfen, dann Songbird an Reed übergeben (Deal)"},
+  "songbird-b":{name:"King of Wands",cure:false,txt:"Songbird helfen, dann Reed erschießen"},
+  "reed-a":{name:"King of Pentacles",cure:true,txt:"Reed helfen, dann Songbird verschonen"},
+  "reed-b":{name:"King of Cups",cure:false,txt:"Reed helfen, dann Songbird töten"}
+};
+var TAGL={
+  "end:star":"Ending Star","end:sun":"Ending Sun","end:secret":"Secret Ending",
+  "end:temp-panam":"Temperance via Panam","end:temp-rogue":"Temperance via Rogue",
+  "rom:judy":"Romanze Judy","rom:river":"Romanze River","rom:panam":"Romanze Panam","rom:kerry":"Romanze Kerry",
+  "takemura":"Takemura retten"
+};
+var SEC=[
+  ["m1","Prolog und Akt 1","Die Reihenfolge folgt dem Hauptstrang, Nebenjobs lassen sich dazwischenschieben."],
+  ["m2","Akt 2","Hier verzweigt sich die Story in parallele Stränge (Judy, Panam, Voodoo Boys, Takemura)."],
+  ["pl","Dogtown (Phantom Liberty)","Gängige Empfehlung: Basisspiel bis zum Point of No Return, dann Phantom Liberty, dann zurück ins Finale."],
+  ["panam","Panams Strang","Startet per Anruf nach Ghost Town und Life During Wartime. Panams Seite wählen, sonst kann der Strang enden."],
+  ["judy","Judys Strang","Startet nach Automatic Love. Romanze nur mit femininem Körpertyp und femininer Stimme."],
+  ["river","Rivers Strang","Romanze nur mit femininem Körpertyp. Rivers Quests sind leicht zu übersehen."],
+  ["johnny","Johnny und Rogue","Die Tapeworm-Gespräche öffnen diesen Strang, nachdem vier Hauptstränge durch sind."],
+  ["kerry","Kerrys Strang","Wird über Johnnys Band-Quests freigeschaltet. Romanze nur mit maskulinem Körpertyp und maskuliner Stimme."],
+  ["new","Neu seit Patch 2.3 bis 2.5","Zusatzinhalte ohne Einfluss auf Endings oder Romanzen. Die Patch-Notes zu 2.5 nennen dazu keine Änderungen."],
+  ["misc","Weitere empfohlene Nebenjobs","Ohne Einfluss auf das Ending, aber mit guten Geschichten."],
+  ["extra","Alle übrigen Nebenjobs","Nur im Umfang „Alles“. Namen ohne Detailnotizen, die Voraussetzungen zeigt das Journal."],
+  ["fin","Finale","Ab hier gilt der Point of No Return."]
+];
+var ITEMS=[];
+function Q(sec,name,base,o){ITEMS.push(Object.assign({sec:sec,name:name,base:base,id:sec+"-"+slug(name)},o||{}))}
+
+/* Prolog und Akt 1 */
+Q("m1","The Streetkid","main",{only:function(s){return s.life==="street"},note:"Prolog deines Lifepaths. Der Lifepath schaltet einzelne Dialogoptionen frei, ändert laut Guides aber weder Romanzen noch Endings."});
+Q("m1","The Nomad","main",{only:function(s){return s.life==="nomad"},note:"Prolog deines Lifepaths. Der Lifepath schaltet einzelne Dialogoptionen frei, ändert laut Guides aber weder Romanzen noch Endings."});
+Q("m1","The Corpo-Rat","main",{only:function(s){return s.life==="corpo"},note:"Prolog deines Lifepaths. Der Lifepath schaltet einzelne Dialogoptionen frei, ändert laut Guides aber weder Romanzen noch Endings."});
+["Practice Makes Perfect","The Rescue","The Ripperdoc","The Ride","The Pickup"].forEach(function(n){Q("m1",n,"main")});
+Q("m1","The Information","main",{note:"Hier lernst du Meredith Stout kennen (Fling, unabhängig vom Körpertyp)."});
+Q("m1","The Heist","main",{note:"Danach Delamain zu Jackies Familie schicken, das öffnet den Nebenjob Heroes."});
+Q("m1","Love Like Fire","main");
+Q("m1","Playing for Time","main");
+
+/* Akt 2 */
+Q("m2","Automatic Love","main",{note:"Danach startet Judys Strang."});
+["The Space In Between","Disasterpiece","Double Life","Down on the Street","Gimme Danger","M'ap Tann Pèlen","I Walk the Line","Never Fade Away"].forEach(function(n){Q("m2",n,"main")});
+Q("m2","Transmission","main",{note:"Voodoo-Boys-Strang. Öffnet außerdem den Nebenjob Send in the Clowns."});
+Q("m2","Ghost Town","main",{note:"Panam lernst du hier kennen. Danach öffnen sich Panams und Rivers Stränge, sobald auch Life During Wartime durch ist."});
+Q("m2","Lightning Breaks","main");
+Q("m2","Life During Wartime","main");
+Q("m2","Play It Safe","main");
+Q("m2","Search and Destroy","main",{needs:["takemura"],
+  note:function(s){return "Takemura-Strang. Takemura lässt sich retten, ohne dass das Spiel darauf hinweist: Nach dem Überfall im Gebäude am ersten Abzweig links halten, unter dem Schutt durch und oben die Gegner besiegen. Er muss in der Absprung-Szene auftauchen. Das entscheidet nur über die Trophäe „The Devil“, nicht über das Ending selbst. Vorher manuell speichern."}});
+Q("m2","Tapeworm","main",{note:"Johnny-Gespräche nach den vier Hauptsträngen. Sie öffnen Chippin' In."});
+
+/* Phantom Liberty */
+var onPL=function(s){return s.pl};
+["Dog Eat Dog","Hole in the Sky","Spider and the Fly","Lucretia My Reflection","The Damned","Get It Together"].forEach(function(n){Q("pl",n,"main",{only:onPL})});
+Q("pl","Firestarter","main",{only:onPL,note:"Hier fällt die Kernentscheidung: Songbird helfen (Zugangscodes hochladen) oder Reed helfen (Icebreaker scharf machen). Davor manuell speichern."});
+Q("pl","The Killing Moon","main",{only:function(s){return s.pl&&s.plFirst==="songbird"},note:"Am Ende nach der Zugfahrt: Songbird lebend an Reed übergeben (Deal) oder Reed erschießen."});
+Q("pl","Somewhat Damaged","main",{only:function(s){return s.pl&&s.plFirst==="reed"},note:"Am Ende im Kern: Songbird verschonen oder töten."});
+["Dogtown Saints","Treating Symptoms","Waiting for Dodger","Prototype in the Scraper","The Man Who Killed Jason Foreman","Talent Academy","Spy in the Jungle","Push It to the Limit","Balls to the Wall","Money for Nothing","No Easy Way Out"].forEach(function(n){Q("pl",n,"opt",{only:onPL})});
+
+/* Panam */
+Q("panam","Riders on the Storm","rec",{needs:["end:star","end:temp-panam","rom:panam"],
+  note:"Nicht scheitern lassen: Nach dem SuperJet von Mitch sofort mit Panam zum feindlichen Camp fahren. Für die Romanze flirten und nicht aus Geldgründen helfen."});
+Q("panam","With a Little Help From My Friends","rec",{needs:["end:star","end:temp-panam","rom:panam"],
+  note:"Panam ruft ein bis zwei Tage nach dem Vorgänger an. Saul nicht über ihren Plan informieren und in Streitfragen zu Panam halten."});
+Q("panam","Queen of the Highway","rec",{needs:["end:star","end:temp-panam","rom:panam"],
+  note:"Startet automatisch. Aus dem Camp wegfahren, 24 Stunden überspringen, zurück zu Panam. Schaltet ihr Safehouse im Camp frei und schließt die Romanze ab."});
+
+/* Judy */
+Q("judy","Both Sides, Now","rec",{needs:["rom:judy"],note:"Judys Plan unterstützen und freiwillig helfen."});
+Q("judy","Ex-Factor","rec",{needs:["rom:judy"]});
+Q("judy","Talkin' 'Bout a Revolution","rec",{needs:["rom:judy"]});
+Q("judy","Pisces","rec",{needs:["rom:judy"],note:"Die Entscheidung am Ende prägt, wie es mit Judy weitergeht."});
+Q("judy","Pyramid Song","rec",{needs:["rom:judy"],note:"Hier fällt die Romanze. Schaltet außerdem Judys Apartment als Safehouse frei."});
+
+/* River */
+Q("river","I Fought the Law","rec",{needs:["rom:river"],note:"Startet per Anruf von Elizabeth Peralez, nachdem Ghost Town und Life During Wartime durch sind und du genug Street Cred in Heywood, City Center oder Westbrook hast."});
+Q("river","The Hunt","rec",{needs:["rom:river"],note:"Peter Pans Versteck ist die Farm in Edgewood. Eine falsche Wahl kann die Romanze kosten."});
+Q("river","Following the River","rec",{needs:["rom:river"],note:"Die Romanze klappt nur mit femininem Körpertyp und wenn Randy überlebt hat."});
+Q("river","Dream On","rec",{note:"Folgt auf I Fought the Law. Deine Entscheidungen haben laut GameSpot keine langfristigen Folgen."});
+
+/* Johnny und Rogue */
+Q("johnny","Chippin' In","rec",{needs:["end:sun","end:secret","end:temp-rogue"],
+  note:"Start im Afterlife, Johnny übernimmt. Am Grab freundlich zu Johnny sein, sonst bleiben Folgequests und Endings gesperrt. Für das Secret Ending zählen zwei konkrete Antworten, siehe Endgame-Skript."});
+Q("johnny","Blistering Love","rec",{needs:["end:sun","end:secret","end:temp-rogue"],
+  note:"Nach Chippin' In Rogue anrufen und sie zum Date ausführen. Beeinflusst das Finale."});
+Q("johnny","Holdin' On","rec",{needs:["rom:kerry"],note:"Erster Band-Besuch. Öffnet Kerrys Strang."});
+Q("johnny","Second Conflict","rec");
+Q("johnny","A Like Supreme","rec");
+
+/* Kerry */
+Q("kerry","Rebel! Rebel!","rec",{needs:["rom:kerry"]});
+Q("kerry","I Don't Wanna Hear It","rec",{needs:["rom:kerry"]});
+Q("kerry","Off the Leash","rec",{needs:["rom:kerry"]});
+Q("kerry","Boat Drinks","rec",{needs:["rom:kerry"],note:"Den Kuss annehmen und Kerry danach am Strand bestätigen, dass ihr zusammen seid."});
+
+/* Weitere empfohlene */
+Q("misc","Heroes","rec",{note:"Kein Einfluss aufs Ending, schließt Akt 1 aber sauber ab."});
+Q("misc","Tune Up","rec",{note:"Zu Beginn von Akt 2 rammt ein Delamain-Taxi deinen Wagen im Parkhaus, danach ruft Delamain an."});
+Q("misc","Epistrophy","rec",{note:"Serie über abtrünnige Delamain-Taxis in der ganzen Stadt. Am besten früh erledigen."});
+Q("misc","Happy Together","rec",{note:"Zeitkritisch, nicht liegen lassen. Du findest sie eine Etage unter deinem Apartment."});
+Q("misc","Send in the Clowns","rec",{note:"Braucht Transmission."});
+Q("misc","Sinnerman","rec",{note:"Danach folgt They Won't Go When I Go, wenn du nie aus der Situation aussteigst."});
+Q("misc","They Won't Go When I Go","rec");
+Q("misc","Fool on the Hill","opt",{note:"20 Tarot-Graffiti sammeln, dann zu Misty. Die letzten zwei Karten gibt es im Endgame. Seit Patch 2.5 kommt eine Erweiterung mit 12 Minor-Arcana-Karten dazu (siehe unten)."});
+
+/* Neu seit Patch 2.3 bis 2.5 */
+Q("new","Clampdown","rec",{note:"Patch 2.5, Prequel zu Edgerunners 2. Startet per Nachricht von Wakako, sobald The Heist und zwei Gigs für Wakako erledigt sind. Spielt im Night City Prison, Belohnung ist ein fünfteiliges King-Set (laut Berichten inkl. Coronation-Revolver)."});
+Q("new","Welcome to Paradise!","rec",{note:"Patch 2.5, Stadtführung mit Richard Night. Braucht The Heist und Street Cred 15. Bekannte Fehler laut Berichten: Quest startet bei manchen nicht, danach kann V in der T-Pose hängen. Vorher speichern."});
+Q("new","Fool on the Hill: Minor Arcana","opt",{note:"Patch 2.5. Eine der 12 neuen Karten scannen startet die Erweiterung, alle 12 geben eine Sonderbelohnung. Das Tarot-Menü trennt jetzt Major und Minor Arcana."});
+Q("new","Fahrzeug-Nebenjobs (Patch 2.3)","opt",{note:"Vier neue Fahrzeuge. Semimaru: The Hunt und The Beast In Me. Mordred: Beast In Me (Badlands, Santo Domingo), Transmission, Search and Destroy. Muramasa: ein Yaiba-Kauf, drei AUTOFIXER-Käufe und der Auftrag Reported Crime: You Play with Fire. Delamain-Taxi auf Abruf nach Don't Lose Your Mind."});
+Q("new","Ariadne (Witcher-Ausrüstung)","opt",{note:"Ariadne schreibt dich an, Kiste mit Kleidung und zwei Waffen (Sihil, Boar Carver) liegt in V's altem Apartment in Megabuilding H10. Alle drei Kleidungsstücke anlegen, in der Nachricht „Foto machen“ wählen. Ohne Auswirkung auf Story oder Ending. In welchem Patch sie kam, belegt die Quelle nicht."});
+
+/* Übrige Nebenjobs */
+["A Cool Metal Fire","A Day in the Life","Beat on the Brat","Big in Japan","Bullets","Burning Desire / Night Moves","Coin Operated Boy","Don't Lose Your Mind","Every Breath You Take","Ezekiel Saw the Wheel","Fortunate Son","Full Disclosure","Gun Music","Human Nature","I'll Fly Away","Imagine","Killing in the Name","Kold Mirage","Losing My Religion / Sacrum Profanum","Love Rollercoaster","Machine Gun","Only Pain","Paid in Full","Psycho Killer","Raymond Chandler Evening","Sex on Wheels","Shoot to Thrill","Small Man, Big Mouth","Space Oddity","Spellbound","Stadium Love","Sweet Dreams","The Ballad of Buck Ravers","The Beast in Me","The Highwayman","The Gift","The Gig","The Gun","The Prophet's Song","There Is a Light That Never Goes Out","These Boots Are Made for Walkin'","Venus in Furs","Violence","War Pigs"].forEach(function(n){Q("extra",n,"opt")});
+Q("extra","Cyberpsycho Sightings (alle)","opt",{note:"Die Sammlung der Cyberpsycho-Aufträge in allen Distrikten."});
+Q("extra","NCPD-Scanner-Hustles (alle)","opt");
+Q("extra","Fixer-Gigs (alle)","opt");
+
+/* Finale */
+Q("fin","Manuell speichern vor dem Balkon","main",{note:"Speichern, bevor du mit Misty zum Balkon gehst. Von dort kommst du für jedes weitere Ending schnell zurück."});
+Q("fin","Nocturne Op55N1","main",{only:function(s){return s.ending!=="tower"},
+  note:"Point of No Return. Danach sind alle offenen Nebenjobs gesperrt, bis das Ending durch ist. Nach den Credits bringt „One More Gig“ dich vor diesen Punkt zurück."});
+Q("fin","Through Pain to Heaven","main",{only:function(s){return s.ending==="tower"},note:"Reed ruft nach den Credits von Phantom Liberty an. Kommt der Anruf nicht, Zeit überspringen und durch die Stadt fahren."});
+Q("fin","Who Wants to Live Forever","main",{only:function(s){return s.ending==="tower"},note:"Point of No Return, unabhängig vom Hauptstory-Stand. Reed holt dich vom Dach bei Misty ab."});
+Q("fin","Things Done Changed","main",{only:function(s){return s.ending==="tower"},note:"Du wachst nach der Operation auf. Das Ending löst sich danach von selbst aus. Patch 2.5 behebt einen Fehler, bei dem ein hängendes Delamain-Taxi hier den Fortschritt blockieren konnte."});
+
+/* ---------- Endgame-Skripte ---------- */
+var SCRIPT={
+  star:[
+    "Manuell speichern, dann mit Misty auf den Balkon zu Johnny.",
+    "Im Gespräch Panam anrufen, um Hilfe bitten und danach die Omega-Blocker nehmen.",
+    "Missionsfolge: We Gotta Live Together, Forward to Death, Belly of the Beast.",
+    "Nach Adam Smasher im Cyberspace sagen, dass du die restliche Lebenszeit leben willst, und durch den Brunnen (Well) zurück in den Körper gehen. Nicht über die Brücke.",
+    "Nach Smasher noch einmal speichern: Von dort kommst du schnell zu Temperance."
+  ],
+  temp_panam:[
+    "Manuell speichern, dann mit Misty auf den Balkon zu Johnny.",
+    "Im Gespräch Panam anrufen, um Hilfe bitten und danach die Omega-Blocker nehmen.",
+    "Missionsfolge: We Gotta Live Together, Forward to Death, Belly of the Beast.",
+    "Nach Adam Smasher im Cyberspace sagen, dass der Körper Johnny gehört, und über die Brücke in den Cyberspace gehen. Nicht in den Brunnen.",
+    "Nach Smasher noch einmal speichern: Von dort kommst du schnell zu Star."
+  ],
+  temp_rogue:[
+    "Manuell speichern, dann mit Misty auf den Balkon zu Johnny.",
+    "Sagen, dass Johnny und Rogue gehen sollen, und das Pseudoendotrizin nehmen. Du spielst ab hier Johnny.",
+    "Missionsfolge: For Whom the Bell Tolls, Changes, Knockin' on Heaven's Door.",
+    "In Changes nach Adam Smasher im Cyberspace nicht über die Brücke gehen, sondern in den Brunnen. Dann kehrt Johnny in V's Körper zurück."
+  ],
+  sun:[
+    "Manuell speichern, dann mit Misty auf den Balkon zu Johnny.",
+    "Sagen, dass Johnny und Rogue gehen sollen, und das Pseudoendotrizin nehmen. Du spielst ab hier Johnny.",
+    "Missionsfolge: For Whom the Bell Tolls, Changes, Knockin' on Heaven's Door.",
+    "In Changes nach Adam Smasher im Cyberspace mit Alt gehen und über die Brücke. Johnny bleibt im Cyberspace, V lebt weiter."
+  ],
+  devil:[
+    "Manuell speichern, dann mit Misty auf den Balkon zu Johnny.",
+    "Sagen, dass Arasaka zu vertrauen riskant, aber lohnend ist, und die Omega-Blocker nehmen.",
+    "Missionsfolge: Last Caress, Totalimmortal, Where Is My Mind?",
+    "Auf der Orbitalstation macht Hellman dir ein Angebot: Vertrag unterschreiben (Engramm in Mikoshi) oder ablehnen und zur Erde zurückkehren.",
+    "Die Trophäe „The Devil“ bekommst du nur, wenn Takemura in Search and Destroy gerettet wurde."
+  ],
+  secret:[
+    "In Chippin' In am Grab die freundlichsten Antworten wählen. Entscheidend sind die Antwort, dass Johnny dir das Leben gerettet hat, und die Antwort, dass auch das Zweite schiefgegangen ist. Danach Blistering Love abschließen.",
+    "Manuell speichern, dann mit Misty auf den Balkon.",
+    "Keine Antwort wählen. Abwechselnd auf die Waffe und auf Johnny schauen, bis er nach bis zu fünf Minuten von selbst ein Solo-Angebot macht.",
+    "Den Plan anhören und den Angriff auf den Arasaka Tower wählen.",
+    "Du gehst allein rein, es gibt nur einen Versuch. Stirbst du, ist das Spiel vorbei, also vorher speichern. Am Ende wählst du Brunnen (Temperance) oder Brücke (Sun)."
+  ],
+  tower:[
+    "In Dogtown mit „Songbird an Reed übergeben (Deal)“ oder „Songbird verschonen“ abschließen. Die beiden anderen Routen verschließen dieses Ending.",
+    "Nach den Credits ruft Reed an und bietet die Relic-Entfernung an. Ablehnen sperrt das Ending laut GamesRadar dauerhaft.",
+    "Auf dem Dach bei Misty Reed anrufen, auch wenn Johnny abrät. Ab hier gibt es kein Zurück.",
+    "Missionsfolge: Through Pain to Heaven, Who Wants to Live Forever, Things Done Changed.",
+    "Danach: zwei Jahre später, fast alle Implantate abgeschaltet, nur Viktor ist noch in Night City. Erledige also vorher alles, was du noch willst."
+  ]
+};
+
+/* ---------- Zustand ---------- */
+var DEF={pl:true,body:"m",life:"street",rom:{panam:true},ending:"star",tempVia:"panam",plFirst:"songbird",plSecond:"a",takemura:false,depth:"rec"};
+var S=clone(DEF), DONE={}, FILTER="open", scriptOpen=true;
+
+function normalize(){
+  if(S.body!=="m"&&S.body!=="f")S.body="m";
+  if(["street","nomad","corpo"].indexOf(S.life)<0)S.life="street";
+  if(!ENDINGS[S.ending])S.ending="star";
+  if(["panam","rogue"].indexOf(S.tempVia)<0)S.tempVia="panam";
+  if(["songbird","reed"].indexOf(S.plFirst)<0)S.plFirst="songbird";
+  if(["a","b"].indexOf(S.plSecond)<0)S.plSecond="a";
+  if(["path","rec","all"].indexOf(S.depth)<0)S.depth="rec";
+  S.pl=!!S.pl; S.takemura=!!S.takemura;
+  if(!S.pl&&ENDINGS[S.ending].pl)S.ending="star";
+  var r={};
+  Object.keys(ROM).forEach(function(k){if(S.rom&&S.rom[k]===true&&ROM[k].body===S.body)r[k]=true});
+  S.rom=r;
+}
+function applyData(o){
+  if(!o||typeof o!=="object"||!o.s||typeof o.s!=="object")return false;
+  var s=o.s, n=clone(DEF);
+  Object.keys(DEF).forEach(function(k){if(k!=="rom"&&s[k]!==undefined)n[k]=s[k]});
+  n.rom=s.rom&&typeof s.rom==="object"?s.rom:{};
+  S=n;
+  var d={};
+  if(o.done&&typeof o.done==="object")Object.keys(o.done).forEach(function(k){if(o.done[k]===true)d[k]=true});
+  DONE=d; normalize(); return true;
+}
+function save(){try{localStorage.setItem(KEY,JSON.stringify({s:S,done:DONE}))}catch(e){}}
+function load(){try{var r=localStorage.getItem(KEY);if(r)applyData(JSON.parse(r))}catch(e){}normalize()}
+
+/* ---------- Ableitungen ---------- */
+function plEnding(){return PLEND[S.plFirst+"-"+S.plSecond]}
+function activeTags(){
+  var t={};
+  var e=S.ending;
+  if(e==="star")t["end:star"]=1;
+  if(e==="sun")t["end:sun"]=1;
+  if(e==="secret")t["end:secret"]=1;
+  if(e==="temperance")t[S.tempVia==="panam"?"end:temp-panam":"end:temp-rogue"]=1;
+  Object.keys(S.rom).forEach(function(k){t["rom:"+k]=1});
+  if(S.takemura)t["takemura"]=1;
+  return t;
+}
+function depthOK(l){
+  if(S.depth==="all")return true;
+  if(S.depth==="rec")return l!=="opt";
+  return l==="main"||l==="must";
+}
+function resolved(){
+  var tags=activeTags();
+  return ITEMS.filter(function(i){return !i.only||i.only(S)}).map(function(i){
+    var hit=(i.needs||[]).filter(function(t){return tags[t]});
+    return Object.assign({},i,{level:hit.length?"must":i.base,reasons:hit.map(function(t){return TAGL[t]})});
+  }).filter(function(i){return depthOK(i.level)});
+}
+function warnings(){
+  var w=[],e=S.ending,pe=plEnding();
+  if(e==="tower"&&!pe.cure)w.push(["warn","Das Tower-Ending braucht in Dogtown „Songbird an Reed übergeben (Deal)“ oder „Songbird verschonen“. Gewählt ist aktuell: "+pe.txt+" ("+pe.name+")."]);
+  if(e==="tower")w.push(["info","Reeds Operation setzt einen Point of No Return, egal wie weit du in der Story bist. Danach sind fast alle Implantate abgeschaltet, es ist 2079 und fast alle Freunde sind weggezogen."]);
+  if(e==="sun"||e==="secret"||(e==="temperance"&&S.tempVia==="rogue"))w.push(["info","Wichtig ist das Verhältnis zu Johnny: In Chippin' In am Grab freundlich bleiben, sonst bleiben diese Endings verschlossen."]);
+  if(e==="secret")w.push(["warn","Das Solo-Finale erlaubt nur einen Versuch. Vor dem Balkon manuell speichern und möglichst stark aufgelevelt antreten."]);
+  if(e==="devil"&&!S.takemura)w.push(["info","Ohne gerettete Takemura gibt es das Ending, aber nicht die Trophäe „The Devil“. Schalte links „Takemura retten“ ein, wenn du sie willst."]);
+  if(e==="star"&&S.rom.judy)w.push(["info","Mit Judy-Romanze begleitet sie dich laut GamesRadar im Star-Ending."]);
+  w.push(["info","Nach Patch 2.5 melden Spieler, dass Misty nicht ansprechbar sein kann. Sie führt dich zum Balkon, also vorher manuell speichern und bei Problemen laden."]);
+  if(S.pl&&e!=="tower")w.push(["info","Dein Dogtown-Ende ("+pe.name+") beeinflusst die Basisspiel-Endings nur über Tower."]);
+  return w;
+}
+
+/* ---------- Rendering ---------- */
+var $=function(id){return document.getElementById(id)};
+function seg(k,opts,val,label){
+  return '<div class="seg" role="radiogroup" aria-label="'+label+'">'+opts.map(function(o){
+    return '<button type="button" class="sb" role="radio" aria-checked="'+(val===o[0])+'" data-act="set" data-k="'+k+'" data-v="'+o[0]+'" data-fk="'+k+'-'+o[0]+'">'+o[1]+'</button>';
+  }).join("")+'</div>';
+}
+function sw(k,label,on){
+  return '<button type="button" class="sw" role="switch" aria-checked="'+on+'" data-act="tog" data-k="'+k+'" data-fk="tog-'+k+'"><span>'+label+'</span><span class="tr" aria-hidden="true"></span></button>';
+}
+function renderConsole(){
+  var h="";
+  h+='<div class="grp"><h3>Spielstand</h3>'+sw("pl","Phantom Liberty dabei",S.pl)+'</div>';
+  h+='<div class="grp"><h3>Körpertyp und Stimme</h3>'+seg("body",[["m","maskulin"],["f","feminin"]],S.body,"Körpertyp und Stimme")+'<p class="hint">Bestimmt, wen du romantisch ansprechen kannst. Lifepath und Genitalien spielen dafür keine Rolle.</p></div>';
+  h+='<div class="grp"><h3>Lifepath</h3>'+seg("life",[["street","Streetkid"],["nomad","Nomad"],["corpo","Corpo"]],S.life,"Lifepath")+'</div>';
+  h+='<div class="grp"><h3>Romanzen</h3><div class="seg">'+Object.keys(ROM).map(function(k){
+    var ok=ROM[k].body===S.body;
+    return '<button type="button" class="sb" aria-pressed="'+(!!S.rom[k])+'" data-act="rom" data-v="'+k+'" data-fk="rom-'+k+'"'+(ok?"":' disabled title="Passt nicht zum gewählten Körpertyp"')+'>'+ROM[k].name+'</button>';
+  }).join("")+'</div><p class="hint">Zwei gleichzeitig sind möglich, jeweils Panam und Kerry oder Judy und River.</p></div>';
+  h+='<div class="grp"><h3>Ziel-Ending</h3><div class="list" role="radiogroup" aria-label="Ziel-Ending">'+Object.keys(ENDINGS).map(function(k){
+    var E=ENDINGS[k],dis=E.pl&&!S.pl;
+    return '<button type="button" class="eo" role="radio" aria-checked="'+(S.ending===k)+'" data-act="set" data-k="ending" data-v="'+k+'" data-fk="end-'+k+'"'+(dis?' disabled':'')+'><b>'+E.name+'</b><span>'+E.short+(dis?" (braucht Phantom Liberty)":"")+'</span></button>';
+  }).join("")+'</div></div>';
+  if(S.ending==="temperance")h+='<div class="grp"><h3>Weg zu Temperance</h3>'+seg("tempVia",[["panam","Über Panam"],["rogue","Über Rogue"]],S.tempVia,"Weg zu Temperance")+'</div>';
+  if(S.pl){
+    var pe=plEnding();
+    h+='<div class="grp"><h3>Dogtown-Route</h3>'+seg("plFirst",[["songbird","Songbird helfen"],["reed","Reed helfen"]],S.plFirst,"Erste Entscheidung in Firestarter");
+    h+=seg("plSecond",S.plFirst==="songbird"?[["a","Songbird übergeben"],["b","Reed erschießen"]]:[["a","Songbird verschonen"],["b","Songbird töten"]],S.plSecond,"Zweite Entscheidung");
+    h+='<p class="hint">Ergibt: '+pe.name+(pe.cure?" (Weg zum Tower-Ending offen)":"")+'</p></div>';
+  }
+  h+='<div class="grp"><h3>Trophäen-Extras</h3>'+sw("takemura","Takemura retten (Trophäe The Devil)",S.takemura)+'</div>';
+  h+='<div class="grp"><h3>Umfang der Liste</h3>'+seg("depth",[["path","Nur Pfad"],["rec","Empfohlen"],["all","Alles"]],S.depth,"Umfang")+'<p class="hint">„Nur Pfad“ zeigt Story und alles, was dein Ending und deine Romanzen brauchen.</p></div>';
+  $("console").innerHTML=h;
+}
+function chips(i){
+  var c="";
+  var lv={main:["main","Story"],must:["must","Muss"],rec:["rec","Empfohlen"],opt:["","Optional"]}[i.level];
+  c+='<span class="chip '+lv[0]+'">'+lv[1]+'</span>';
+  i.reasons.forEach(function(r){c+='<span class="chip why">'+r+'</span>'});
+  return c;
+}
+function renderPlan(items){
+  var E=ENDINGS[S.ending],pe=plEnding();
+  var pre=items.filter(function(i){return i.sec!=="fin"&&(i.level==="main"||i.level==="must")});
+  var preDone=pre.filter(function(i){return DONE[i.id]}).length;
+  var all=items.length,allDone=items.filter(function(i){return DONE[i.id]}).length;
+  var pct=function(a,b){return b?Math.round(a/b*100):0};
+  var facts=[S.body==="m"?"maskulin":"feminin",{street:"Streetkid",nomad:"Nomad",corpo:"Corpo"}[S.life],
+    Object.keys(S.rom).length?"Romanze: "+Object.keys(S.rom).map(function(k){return ROM[k].name.split(" ")[0]}).join(" + "):"keine Romanze"];
+  if(S.pl)facts.push("Dogtown: "+pe.name);
+  var script=SCRIPT[S.ending==="temperance"?(S.tempVia==="panam"?"temp_panam":"temp_rogue"):S.ending];
+  var h='<p class="eyebrow">// Dein Run</p><h2>'+E.name+'<small>'+E.sub+'</small></h2><p>'+E.blurb+'</p>';
+  h+='<div class="facts">'+facts.map(function(f){return '<span class="fact">'+f+'</span>'}).join("")+'</div>';
+  h+='<div class="stats"><div class="stat"><span class="t">Pflicht vor dem Point of No Return</span><span class="v">'+preDone+' / '+pre.length+'</span><div class="bar"><i style="width:'+pct(preDone,pre.length)+'%"></i></div></div>';
+  h+='<div class="stat"><span class="t">Gesamte Liste</span><span class="v">'+allDone+' / '+all+'</span><div class="bar"><i style="width:'+pct(allDone,all)+'%"></i></div></div></div>';
+  var w=warnings();
+  if(w.length)h+='<div class="warns">'+w.map(function(x){return '<div class="w '+x[0]+'"><b>'+(x[0]==="warn"?"Achtung":"Hinweis")+'</b>'+x[1]+'</div>'}).join("")+'</div>';
+  h+='<details class="script" id="script"'+(scriptOpen?" open":"")+'><summary>Endgame-Skript: '+E.name+(S.ending==="temperance"?(S.tempVia==="panam"?" (Panam-Weg)":" (Rogue-Weg)"):"")+'</summary><ol>'+script.map(function(s){return '<li>'+s+'</li>'}).join("")+'</ol></details>';
+  $("plan").innerHTML=h;
+}
+function renderFilter(){
+  $("filter").innerHTML=[["open","Offen"],["all","Alle"],["done","Erledigt"]].map(function(o){
+    return '<button type="button" class="sb" role="radio" aria-checked="'+(FILTER===o[0])+'" data-act="flt" data-v="'+o[0]+'" data-fk="flt-'+o[0]+'">'+o[1]+'</button>';
+  }).join("");
+}
+function renderList(items){
+  var h="",shown=0;
+  SEC.forEach(function(sc){
+    var rows=items.filter(function(i){return i.sec===sc[0]});
+    if(!rows.length)return;
+    var done=rows.filter(function(i){return DONE[i.id]}).length;
+    var vis=rows.filter(function(i){return FILTER==="all"||(FILTER==="done"?DONE[i.id]:!DONE[i.id])});
+    if(!vis.length)return;
+    shown+=vis.length;
+    h+='<section class="sec"><h3>'+sc[1]+'<span class="n">'+done+' / '+rows.length+'</span></h3><p class="intro">'+sc[2]+'</p><ul class="qs">';
+    vis.forEach(function(i){
+      var d=!!DONE[i.id];
+      var note=typeof i.note==="function"?i.note(S):i.note;
+      h+='<li class="q'+(d?" is-done":"")+'"><span class="chk"><input type="checkbox" id="c-'+i.id+'" data-done="'+i.id+'" data-fk="c-'+i.id+'"'+(d?" checked":"")+'><span class="box" aria-hidden="true"></span></span>';
+      h+='<div class="qb"><div class="qh"><label class="qn" for="c-'+i.id+'">'+i.name+'</label>'+chips(i)+'</div>'+(note?'<p class="qnote">'+note+'</p>':'')+'</div></li>';
+    });
+    h+='</ul></section>';
+  });
+  if(!shown)h='<div class="empty">'+(FILTER==="done"?"Noch nichts abgehakt.":"Hier ist nichts mehr offen. Stell oben einen größeren Umfang ein oder wechsle den Filter.")+'</div>';
+  $("list").innerHTML=h;
+  $("count").textContent=shown+" Einträge sichtbar";
+}
+function render(){
+  var ae=document.activeElement,fk=ae&&ae.getAttribute?ae.getAttribute("data-fk"):null;
+  var items=resolved();
+  renderConsole();renderPlan(items);renderFilter();renderList(items);
+  if(fk){var n=document.querySelector('[data-fk="'+fk+'"]');if(n&&!n.disabled)n.focus({preventScroll:true})}
+}
+
+/* ---------- Events ---------- */
+document.addEventListener("click",function(e){
+  var b=e.target.closest("[data-act]");
+  if(!b||b.disabled)return;
+  var a=b.dataset.act,k=b.dataset.k,v=b.dataset.v;
+  if(a==="set"){
+    S[k]=v;
+    if(k==="ending"&&v==="tower"&&!plEnding().cure)S.plSecond="a";
+  }else if(a==="tog"){S[k]=!S[k]}
+  else if(a==="rom"){if(S.rom[v])delete S.rom[v];else S.rom[v]=true}
+  else if(a==="flt"){FILTER=v}
+  normalize();save();render();
+});
+document.addEventListener("change",function(e){
+  var t=e.target;
+  if(t&&t.dataset&&t.dataset.done){
+    if(t.checked)DONE[t.dataset.done]=true;else delete DONE[t.dataset.done];
+    save();render();
+  }
+});
+document.addEventListener("toggle",function(e){if(e.target&&e.target.id==="script")scriptOpen=e.target.open},true);
+
+var msg=function(t){$("io-msg").textContent=t};
+$("io-export").addEventListener("click",function(){$("io-text").value=JSON.stringify({s:S,done:DONE});msg("Export steht im Feld.")});
+$("io-copy").addEventListener("click",function(){
+  var ta=$("io-text");
+  if(!ta.value)ta.value=JSON.stringify({s:S,done:DONE});
+  var fallback=function(){ta.focus();ta.select();msg("Text markiert, bitte mit Strg/Cmd+C kopieren.")};
+  try{navigator.clipboard.writeText(ta.value).then(function(){msg("Kopiert.")},fallback)}catch(err){fallback()}
+});
+$("io-load").addEventListener("click",function(){
+  try{
+    var o=JSON.parse($("io-text").value);
+    if(applyData(o)){save();render();msg("Geladen.")}else msg("Das Format passt nicht.");
+  }catch(err){msg("Der Text ist kein gültiges JSON.")}
+});
+var DL=null;
+try{
+  if(window.claude&&window.claude.use){
+    window.claude.use("downloads").then(function(d){DL=d;if(d)$("io-save").hidden=false},function(){});
+  }else{
+    $("io-save").hidden=false; /* eigenständig gehostet: normaler Browser-Download */
+  }
+}catch(err){}
+$("io-save").addEventListener("click",function(){
+  var name="cp77-fahrplan-"+new Date().toISOString().slice(0,10)+".json";
+  var txt=JSON.stringify({s:S,done:DONE},null,1);
+  if(!DL){
+    var a=document.createElement("a"),u=URL.createObjectURL(new Blob([txt],{type:"application/json"}));
+    a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();
+    setTimeout(function(){URL.revokeObjectURL(u)},1000);
+    msg("Datei wird heruntergeladen.");
+    return;
+  }
+  DL.save({filename:name,data:txt}).then(function(){
+    msg("Datei gespeichert.");
+  },function(e){
+    msg(e&&e.code==="declined"?"Speichern abgebrochen.":"Speichern ist hier nicht möglich. Nutze den Text-Export.");
+  });
+});
+$("io-pick").addEventListener("click",function(){$("io-file").click()});
+$("io-file").addEventListener("change",function(){
+  var f=$("io-file").files&&$("io-file").files[0];
+  if(!f)return;
+  if(f.size>1048576){msg("Die Datei ist zu groß für einen Fahrplan-Export.");$("io-file").value="";return}
+  var r=new FileReader();
+  r.onload=function(){
+    try{
+      var o=JSON.parse(String(r.result));
+      if(applyData(o)){save();render();msg("Geladen aus "+f.name+".")}else msg("Das Format passt nicht.");
+    }catch(err){msg("Die Datei ist kein gültiger Fahrplan-Export.")}
+    $("io-file").value="";
+  };
+  r.onerror=function(){msg("Die Datei ließ sich nicht lesen.");$("io-file").value=""};
+  r.readAsText(f);
+});
+$("io-reset").addEventListener("click",function(){
+  var b=$("io-reset");
+  if(b.getAttribute("data-arm")!=="1"){b.setAttribute("data-arm","1");b.textContent="Wirklich alles zurücksetzen?";msg("Noch einmal klicken zum Bestätigen.");return}
+  S=clone(DEF);DONE={};FILTER="open";normalize();save();render();
+  b.setAttribute("data-arm","0");b.textContent="Alles zurücksetzen";msg("Zurückgesetzt.");
+});
+
+load();render();
+})();
+</script>
+</body>
+</html>
